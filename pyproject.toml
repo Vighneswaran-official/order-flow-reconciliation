@@ -1,0 +1,16 @@
+[project]
+name = "order-flow-reconciliation"
+version = "3.0.0"
+description = "Enterprise Order Flow & 5-File Settlement Reconciliation Suite"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "python-multipart>=0.0.9"
+]
+
+[tool.vercel]
+entrypoint = "web_server:app"

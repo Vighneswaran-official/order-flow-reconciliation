@@ -30,13 +30,24 @@ from run import (
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_DIR = os.path.join(BASE_DIR, "input")
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
-os.makedirs(INPUT_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(LOGS_DIR, exist_ok=True)
+# On Vercel / serverless runtimes, local filesystem is read-only except /tmp
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+if IS_VERCEL:
+    INPUT_DIR = os.path.join("/tmp", "input")
+    OUTPUT_DIR = os.path.join("/tmp", "output")
+    LOGS_DIR = os.path.join("/tmp", "logs")
+else:
+    INPUT_DIR = os.path.join(BASE_DIR, "input")
+    OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+    LOGS_DIR = os.path.join(BASE_DIR, "logs")
+
+try:
+    os.makedirs(INPUT_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(LOGS_DIR, exist_ok=True)
+except Exception:
+    pass
 
 app = FastAPI(
     title="OrderFlow Studio",

@@ -111,15 +111,21 @@ class DualLogger:
     def __init__(self, log_path: str):
         self.log_path = log_path
         self.entries = []
-        os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
-        with open(self.log_path, "w", encoding="utf-8") as f:
-            f.write(f"=== ORDER FLOW & SETTLEMENT PIPELINE AUDIT LOG: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+            with open(self.log_path, "w", encoding="utf-8") as f:
+                f.write(f"=== ORDER FLOW & SETTLEMENT PIPELINE AUDIT LOG: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
+        except Exception:
+            pass
 
     def log(self, message: str = ""):
         print(message)
         self.entries.append(message)
-        with open(self.log_path, "a", encoding="utf-8") as f:
-            f.write(message + "\n")
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(message + "\n")
+        except Exception:
+            pass
 
     def warning(self, message: str):
         self.log(f"[WARNING] {message}")
