@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Flow & Settlement Reconciliation</title>
+  <meta name="description" content="Generate one final Excel report from five CSV/Excel files with complete settlement and Master SKU reconciliation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css?v=8.0">
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-area">
+        <div class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Order Flow & Settlement Reconciliation</h1>
+          <p class="brand-subtitle">Automated 5-File Reconciliation &bull; One Final Excel Report</p>
+        </div>
+      </div>
+      <div id="status-pill" class="status-pill status-ready">
+        <span class="status-dot"></span>
+        <span id="status-pill-text">Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Unified Container -->
+  <main class="main-container">
+    <div class="card unified-card">
+
+      <!-- Upload Zone -->
+      <div id="drop-zone" class="drop-zone">
+        <input type="file" id="file-input" multiple accept=".csv, .xlsx, .xls" class="file-input-hidden">
+        <div class="drop-icon-wrapper">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h2 class="drop-title">Drop your CSV or Excel files here, or <span class="browse-link">browse</span></h2>
+        <p class="drop-subtitle">Auto-detects: <strong>Seller Orders</strong>, <strong>Order Flow</strong>, <strong>Prepaid Settlement</strong>, <strong>Postpaid Settlement</strong>, &amp; <strong>Master SKU</strong></p>
+      </div>
+
+      <!-- 5 Detected Files Badges In Same Area -->
+      <div id="detected-files-bar" class="detected-files-grid">
+        <!-- 1. Seller Orders -->
+        <div class="file-badge-card is-missing" id="card-orders" data-role="seller_orders">
+          <input type="file" id="input-orders" class="card-file-input" accept=".csv, .xlsx, .xls" style="display:none;" data-role="seller_orders">
+          <div class="file-badge-header">
+            <span class="badge-role-tag">1. Seller Orders</span>
+            <div class="badge-header-actions">
+              <span id="status-tag-orders" class="badge-status-chip missing">Missing</span>
+              <button type="button" class="btn-cancel-file" id="btn-cancel-orders" title="Remove file" data-role="seller_orders" aria-label="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-badge-body">
+            <div id="name-seller-orders" class="file-badge-name">Scanning...</div>
+            <div id="meta-seller-orders" class="file-badge-meta">Click or drop file here</div>
+          </div>
+        </div>
+
+        <!-- 2. Order Flow -->
+        <div class="file-badge-card is-missing" id="card-flow" data-role="order_flow">
+          <input type="file" id="input-flow" class="card-file-input" accept=".csv, .xlsx, .xls" style="display:none;" data-role="order_flow">
+          <div class="file-badge-header">
+            <span class="badge-role-tag">2. Order Flow</span>
+            <div class="badge-header-actions">
+              <span id="status-tag-flow" class="badge-status-chip missing">Missing</span>
+              <button type="button" class="btn-cancel-file" id="btn-cancel-flow" title="Remove file" data-role="order_flow" aria-label="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-badge-body">
+            <div id="name-order-flow" class="file-badge-name">Scanning...</div>
+            <div id="meta-order-flow" class="file-badge-meta">Click or drop file here</div>
+          </div>
+        </div>
+
+        <!-- 3. Prepaid Settlement -->
+        <div class="file-badge-card is-missing" id="card-prepaid" data-role="prepaid_settlement">
+          <input type="file" id="input-prepaid" class="card-file-input" accept=".csv, .xlsx, .xls" style="display:none;" data-role="prepaid_settlement">
+          <div class="file-badge-header">
+            <span class="badge-role-tag">3. Prepaid Settlement</span>
+            <div class="badge-header-actions">
+              <span id="status-tag-prepaid" class="badge-status-chip missing">Missing</span>
+              <button type="button" class="btn-cancel-file" id="btn-cancel-prepaid" title="Remove file" data-role="prepaid_settlement" aria-label="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-badge-body">
+            <div id="name-prepaid" class="file-badge-name">Scanning...</div>
+            <div id="meta-prepaid" class="file-badge-meta">Click or drop file here</div>
+          </div>
+        </div>
+
+        <!-- 4. Postpaid Settlement -->
+        <div class="file-badge-card is-missing" id="card-postpaid" data-role="postpaid_settlement">
+          <input type="file" id="input-postpaid" class="card-file-input" accept=".csv, .xlsx, .xls" style="display:none;" data-role="postpaid_settlement">
+          <div class="file-badge-header">
+            <span class="badge-role-tag">4. Postpaid Settlement</span>
+            <div class="badge-header-actions">
+              <span id="status-tag-postpaid" class="badge-status-chip missing">Missing</span>
+              <button type="button" class="btn-cancel-file" id="btn-cancel-postpaid" title="Remove file" data-role="postpaid_settlement" aria-label="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-badge-body">
+            <div id="name-postpaid" class="file-badge-name">Scanning...</div>
+            <div id="meta-postpaid" class="file-badge-meta">Click or drop file here</div>
+          </div>
+        </div>
+
+        <!-- 5. Master SKU -->
+        <div class="file-badge-card is-missing" id="card-master" data-role="master_sku">
+          <input type="file" id="input-master" class="card-file-input" accept=".csv, .xlsx, .xls" style="display:none;" data-role="master_sku">
+          <div class="file-badge-header">
+            <span class="badge-role-tag">5. Master SKU File</span>
+            <div class="badge-header-actions">
+              <span id="status-tag-master" class="badge-status-chip missing">Missing</span>
+              <button type="button" class="btn-cancel-file" id="btn-cancel-master" title="Remove file" data-role="master_sku" aria-label="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-badge-body">
+            <div id="name-master-sku" class="file-badge-name">Scanning...</div>
+            <div id="meta-master-sku" class="file-badge-meta">Click or drop file here</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="action-btn-row">
+        <button id="btn-generate" class="btn btn-primary btn-generate" disabled>
+          <svg class="btn-spinner hidden" width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" fill="none"/></svg>
+          <svg class="btn-play-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Generate Final Excel Report</span>
+        </button>
+      </div>
+
+      <!-- Download Result Area (Shown in same area upon completion) -->
+      <div id="download-section" class="download-section hidden">
+        <div class="download-result-box">
+          <div class="result-message">
+            <div class="result-check">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div>
+              <h3 id="result-title" class="result-title">Final Excel Report Ready</h3>
+              <p id="result-subtitle" class="result-subtitle">All 5 reports merged &bull; Sheets: Final, Settlement_Data, Settlement_Pivot</p>
+            </div>
+          </div>
+          <div class="download-buttons">
+            <a id="btn-dl-excel" href="/api/download/excel" class="btn btn-success btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+              Download Final Report (.xlsx)
+            </a>
+            <a id="btn-dl-log" href="/api/download/log" class="btn btn-secondary btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              View Audit Log (.txt)
+            </a>
+          </div>
+        </div>
+
+        <!-- Metrics Overview Strip -->
+        <div class="metrics-strip">
+          <div class="metric-item">
+            <span class="metric-label">Order Rows</span>
+            <span id="metric-order-rows" class="metric-value">—</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">SKU Match Rate</span>
+            <span id="metric-match-rate" class="metric-value">—</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Prepaid Settlement</span>
+            <span id="metric-prepaid-amt" class="metric-value">—</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Postpaid Settlement</span>
+            <span id="metric-postpaid-amt" class="metric-value">—</span>
+          </div>
+          <div class="metric-item highlight-metric">
+            <span class="metric-label">Final Report Settled</span>
+            <span id="metric-final-amt" class="metric-value">—</span>
+          </div>
+          <div class="metric-item highlight-payout">
+            <span class="metric-label">Final Report Payout</span>
+            <span id="metric-payout-amt" class="metric-value">—</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Net Product Cost</span>
+            <span id="metric-net-cost" class="metric-value">—</span>
+          </div>
+          <div class="metric-item highlight-profit">
+            <span class="metric-label">Estimated Profit</span>
+            <span id="metric-profit-amt" class="metric-value">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clean Final Sheet Preview Table (11 Columns) -->
+      <div id="output-preview-section" class="output-preview-section hidden">
+        <div class="preview-header">
+          <div>
+            <h3 class="preview-title">Report Preview: Sheet "Final"</h3>
+            <p class="preview-subtitle">Exact 11 Columns matching Sample Reference: <code>order release id</code> &bull; <code>seller sku code</code> &bull; <code>Style Name</code> &bull; <code>return_type</code> &bull; <code>QTY</code> &bull; <code>RETURN QTY</code> &bull; <code>SALE QTY </code> &bull; <code>Payout</code> &bull; <code>NET PRODUCT COST </code> &bull; <code>Settled_Amount</code> &bull; <code>PROFIT</code></p>
+          </div>
+          <div class="preview-search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="preview-search-input" placeholder="Search order release id, SKU, style, return type, amount, payout..." class="search-input">
+          </div>
+        </div>
+
+        <div class="table-container" style="overflow-x: auto;">
+          <table id="preview-table" class="data-table" style="min-width: 1200px;">
+            <thead>
+              <tr>
+                <th style="width: 12%;">order release id</th>
+                <th style="width: 16%;">seller sku code</th>
+                <th style="width: 12%;">Style Name</th>
+                <th style="width: 9%; text-align: center;">return_type</th>
+                <th style="width: 5%; text-align: center;">QTY</th>
+                <th style="width: 7%; text-align: center;">RETURN QTY</th>
+                <th style="width: 7%; text-align: center;">SALE QTY </th>
+                <th style="width: 8%; text-align: right;">Payout</th>
+                <th style="width: 11%; text-align: right;">NET PRODUCT COST </th>
+                <th style="width: 10%; text-align: right;">Settled_Amount</th>
+                <th style="width: 8%; text-align: right;">PROFIT</th>
+              </tr>
+            </thead>
+            <tbody id="preview-tbody">
+              <!-- Populated by app.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="preview-footer">
+          <div id="preview-count" class="preview-count">Showing 0 to 0 of 0 records</div>
+          <div class="preview-pagination">
+            <button id="btn-prev" class="btn btn-sm btn-outline">&larr; Previous</button>
+            <span id="page-text" class="page-text">Page 1 / 1</span>
+            <button id="btn-next" class="btn btn-sm btn-outline">Next &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/js/app.js?v=8.0"></script>
+</body>
+</html>

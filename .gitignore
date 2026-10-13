@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Project generated outputs & archives (keep folder via .gitkeep)
+output/*
+!output/.gitkeep
+output/archive/
+
+# Execution logs (keep folder via .gitkeep)
+logs/*
+!logs/.gitkeep
+
+# Input datasets with confidential/large data (keep folder via .gitkeep)
+input/*
+!input/.gitkeep
+
+# IDEs & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
