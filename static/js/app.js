@@ -324,6 +324,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   async function handleUpload(fileList, targetRole = null) {
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocalhost) {
+      for (let i = 0; i < fileList.length; i++) {
+        const f = fileList[i];
+        if (f.size > 4.5 * 1024 * 1024) {
+          const sizeMB = (f.size / (1024 * 1024)).toFixed(1);
+          showToast(`"${f.name}" is ${sizeMB} MB. Vercel max payload is 4.5 MB. Please use a compact file under 4.5 MB or run locally at http://localhost:8000`, "error", 8000);
+          return;
+        }
+      }
+    }
+
     const formData = new FormData();
     for (let i = 0; i < fileList.length; i++) {
       formData.append("files", fileList[i]);
@@ -337,7 +349,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
+      const responseText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        if (res.status === 413 || (responseText && responseText.toLowerCase().includes("request entity too large"))) {
+          throw new Error("File exceeds server upload limit (Vercel max payload is 4.5 MB). Use http://localhost:8000 locally or upload a compact Master file under 4.5 MB.");
+        }
+        throw new Error(responseText.slice(0, 150) || `Server error (${res.status})`);
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || `Upload failed (${res.status})`);
+      }
 
       const uploaded = data.uploaded || [];
       const successful = uploaded.filter(u => u.success);
@@ -353,7 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await checkStatus();
     } catch (err) {
-      showToast("Upload failed: " + err.message, "error");
+      showToast("Upload failed: " + err.message, "error", 7000);
       elements.statusPill.className = "status-pill";
       safeText(elements.statusPillText, "Upload Failed");
     }
