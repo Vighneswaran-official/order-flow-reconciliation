@@ -310,6 +310,12 @@ async def upload_file(
             continue
 
         raw_contents = await file.read()
+        if raw_contents.startswith(b"\x1f\x8b"):
+            import gzip
+            try:
+                raw_contents = gzip.decompress(raw_contents)
+            except Exception:
+                pass
         
         # Save file directly with appropriate name
         clean_filename = fname
@@ -377,6 +383,108 @@ async def upload_file(
     return {
         "uploaded": results,
         "status": scan
+    }
+
+
+@app.post("/api/upload-chunk")
+async def upload_chunk(
+    chunk: UploadFile = File(...),
+    upload_id: str = Form(...),
+    chunk_index: int = Form(...),
+    total_chunks: int = Form(...),
+    filename: str = Form(...),
+    target_role: Optional[str] = Form(None)
+):
+    """
+    Accepts individual chunks of large files.
+    When all chunks arrive, reassembles and decompresses (if gzipped) into INPUT_DIR.
+    """
+    chunk_dir = os.path.join(INPUT_DIR, "_chunks", upload_id)
+    os.makedirs(chunk_dir, exist_ok=True)
+    chunk_path = os.path.join(chunk_dir, f"{chunk_index:05d}.part")
+    chunk_data = await chunk.read()
+    with open(chunk_path, "wb") as f:
+        f.write(chunk_data)
+
+    parts = sorted(glob.glob(os.path.join(chunk_dir, "*.part")))
+    if len(parts) == total_chunks:
+        # Reassemble
+        assembled_data = bytearray()
+        for p in parts:
+            with open(p, "rb") as f:
+                assembled_data.extend(f.read())
+
+        # Clean up chunk directory
+        try:
+            shutil.rmtree(chunk_dir)
+        except Exception:
+            pass
+
+        # Decompress if gzipped
+        if assembled_data.startswith(b"\x1f\x8b"):
+            import gzip
+            try:
+                assembled_data = bytearray(gzip.decompress(assembled_data))
+            except Exception:
+                pass
+
+        fname = os.path.basename(filename)
+        clean_filename = fname
+        c_lower = clean_filename.lower()
+
+        if target_role == "master_sku" and "master" not in c_lower:
+            clean_filename = f"Master_{clean_filename}"
+        elif target_role == "prepaid_settlement" and "prepaid" not in c_lower:
+            clean_filename = f"Prepaid_{clean_filename}"
+        elif target_role == "postpaid_settlement" and "postpaid" not in c_lower:
+            clean_filename = f"Postpaid_{clean_filename}"
+        elif target_role == "seller_orders" and "seller" not in c_lower:
+            clean_filename = f"Seller_Orders_{clean_filename}"
+        elif target_role == "order_flow" and not c_lower.startswith("part-") and "flow" not in c_lower:
+            clean_filename = f"part-00000_{clean_filename}"
+
+        saved_path = os.path.join(INPUT_DIR, clean_filename)
+        with open(saved_path, "wb") as f:
+            f.write(assembled_data)
+
+        info = inspect_file(saved_path)
+        valid_roles = ("seller_orders", "order_flow", "prepaid_settlement", "postpaid_settlement", "master_sku")
+        assigned_role = target_role if target_role in valid_roles else info["role"]
+
+        if assigned_role == "generic_settlement":
+            scan_now = scan_input_directory()
+            if not scan_now.get("detected_prepaid"):
+                assigned_role = "prepaid_settlement"
+            else:
+                assigned_role = "postpaid_settlement"
+
+        if assigned_role == "seller_orders":
+            STATE["active_orders_file"] = clean_filename
+        elif assigned_role == "order_flow":
+            STATE["active_flow_file"] = clean_filename
+        elif assigned_role == "prepaid_settlement":
+            STATE["active_prepaid_file"] = clean_filename
+        elif assigned_role == "postpaid_settlement":
+            STATE["active_postpaid_file"] = clean_filename
+        elif assigned_role == "master_sku":
+            STATE["active_master_file"] = clean_filename
+
+        scan = scan_input_directory()
+        return {
+            "uploaded": [{
+                **info,
+                "filename": clean_filename,
+                "success": True,
+                "assigned_role": assigned_role
+            }],
+            "status": scan,
+            "completed": True
+        }
+
+    return {
+        "completed": False,
+        "chunk_index": chunk_index,
+        "total_chunks": total_chunks
     }
 
 

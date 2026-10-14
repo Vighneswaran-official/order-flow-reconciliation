@@ -323,62 +323,128 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  async function handleUpload(fileList, targetRole = null) {
-    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    if (!isLocalhost) {
-      for (let i = 0; i < fileList.length; i++) {
-        const f = fileList[i];
-        if (f.size > 4.5 * 1024 * 1024) {
-          const sizeMB = (f.size / (1024 * 1024)).toFixed(1);
-          showToast(`"${f.name}" is ${sizeMB} MB. Vercel max payload is 4.5 MB. Please use a compact file under 4.5 MB or run locally at http://localhost:8000`, "error", 8000);
-          return;
-        }
+  async function compressBlob(blob) {
+    if (typeof CompressionStream === "undefined") {
+      return blob;
+    }
+    try {
+      const cs = new CompressionStream("gzip");
+      const stream = blob.stream().pipeThrough(cs);
+      return await new Response(stream).blob();
+    } catch (e) {
+      console.warn("Compression failed, using uncompressed blob:", e);
+      return blob;
+    }
+  }
+
+  async function uploadFileWithFallback(file, targetRole = null) {
+    let blobToSend = file;
+    let isCompressed = false;
+
+    // Auto-compress files larger than 2.5 MB to effortlessly fit under Vercel's 4.5 MB limit
+    if (file.size > 2.5 * 1024 * 1024) {
+      safeText(elements.statusPillText, `Optimizing ${file.name}...`);
+      const compressed = await compressBlob(file);
+      if (compressed.size < file.size) {
+        blobToSend = compressed;
+        isCompressed = true;
       }
     }
 
-    const formData = new FormData();
-    for (let i = 0; i < fileList.length; i++) {
-      formData.append("files", fileList[i]);
-    }
-    if (targetRole) {
-      formData.append("target_role", targetRole);
-    }
+    // If within 4 MB, upload in a single direct request
+    if (blobToSend.size <= 4.0 * 1024 * 1024) {
+      safeText(elements.statusPillText, `Uploading ${file.name}...`);
+      const formData = new FormData();
+      formData.append("files", blobToSend, file.name);
+      if (targetRole) {
+        formData.append("target_role", targetRole);
+      }
 
-    elements.statusPill.className = "status-pill status-running";
-    safeText(elements.statusPillText, "Uploading & Processing...");
-
-    try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const responseText = await res.text();
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseErr) {
-        if (res.status === 413 || (responseText && responseText.toLowerCase().includes("request entity too large"))) {
-          throw new Error("File exceeds server upload limit (Vercel max payload is 4.5 MB). Use http://localhost:8000 locally or upload a compact Master file under 4.5 MB.");
-        }
         throw new Error(responseText.slice(0, 150) || `Server error (${res.status})`);
       }
 
       if (!res.ok) {
         throw new Error(data.error || data.detail || `Upload failed (${res.status})`);
       }
+      return data;
+    }
 
-      const uploaded = data.uploaded || [];
-      const successful = uploaded.filter(u => u.success);
-      const failed = uploaded.filter(u => !u.success);
+    // For files still > 4 MB even after compression, upload in 2.5 MB chunks
+    const chunkSize = 2.5 * 1024 * 1024;
+    const totalChunks = Math.ceil(blobToSend.size / chunkSize);
+    const uploadId = "up_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+    let finalData = null;
 
-      if (failed.length > 0) {
-        const errorMsgs = failed.map(f => `${f.filename}: ${f.error || "Failed"}`).join("; ");
-        showToast(`Upload error: ${errorMsgs}`, "error", 6000);
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * chunkSize;
+      const end = Math.min(start + chunkSize, blobToSend.size);
+      const chunkBlob = blobToSend.slice(start, end);
+
+      safeText(elements.statusPillText, `Uploading ${file.name} (${chunkIndex + 1}/${totalChunks})...`);
+
+      const chunkForm = new FormData();
+      chunkForm.append("chunk", chunkBlob, file.name);
+      chunkForm.append("upload_id", uploadId);
+      chunkForm.append("chunk_index", chunkIndex.toString());
+      chunkForm.append("total_chunks", totalChunks.toString());
+      chunkForm.append("filename", file.name);
+      if (targetRole) {
+        chunkForm.append("target_role", targetRole);
       }
-      if (successful.length > 0) {
-        showToast(`Uploaded ${successful.length} file(s) successfully`, "success");
+
+      const res = await fetch("/api/upload-chunk", { method: "POST", body: chunkForm });
+      const text = await res.text();
+      let resJson;
+      try {
+        resJson = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Chunk ${chunkIndex + 1} failed: ${text.slice(0, 100)}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(resJson.detail || resJson.error || `Chunk ${chunkIndex + 1} error (${res.status})`);
+      }
+
+      if (resJson.completed) {
+        finalData = resJson;
+      }
+    }
+
+    return finalData || { uploaded: [{ filename: file.name, success: true }] };
+  }
+
+  async function handleUpload(fileList, targetRole = null) {
+    elements.statusPill.className = "status-pill status-running";
+    safeText(elements.statusPillText, "Uploading & Processing...");
+
+    try {
+      let totalSuccess = 0;
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        const data = await uploadFileWithFallback(file, targetRole);
+        const uploaded = data.uploaded || [];
+        const failed = uploaded.filter(u => !u.success);
+        if (failed.length > 0) {
+          const errorMsgs = failed.map(f => `${f.filename}: ${f.error || "Failed"}`).join("; ");
+          showToast(`Upload error: ${errorMsgs}`, "error", 7000);
+        } else {
+          totalSuccess++;
+        }
+      }
+
+      if (totalSuccess > 0) {
+        showToast(`Uploaded ${totalSuccess} file(s) successfully`, "success");
       }
 
       await checkStatus();
     } catch (err) {
-      showToast("Upload failed: " + err.message, "error", 7000);
+      showToast("Upload failed: " + err.message, "error", 8000);
       elements.statusPill.className = "status-pill";
       safeText(elements.statusPillText, "Upload Failed");
     }
